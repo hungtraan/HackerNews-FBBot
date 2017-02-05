@@ -1,0 +1,15 @@
+appdirs==1.4.0
+beautifulsoup4==4.5.3
+click==6.7
+Flask==0.12
+gunicorn==19.6.0
+itsdangerous==0.24
+Jinja2==2.9.5
+MarkupSafe==0.23
+packaging==16.8
+Pattern==2.6
+pyparsing==2.1.10
+python-firebase==1.2
+requests==2.13.0
+six==1.10.0
+Werkzeug==0.11.15
