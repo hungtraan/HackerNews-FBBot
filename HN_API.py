@@ -10,127 +10,123 @@ firebase = firebase.FirebaseApplication('https://hacker-news.firebaseio.com', No
 LIMIT = 9
 
 def get_stories(story_type='best', limit=LIMIT):
-	# r = requests.get("/%sstories.json"%(story_type))
-	results = firebase.get('/v0/%sstories'%(story_type), None)
-	stories_list = results[:limit]
-	
-	stories = []
+    # r = requests.get("/%sstories.json"%(story_type))
+    results = firebase.get('/v0/%sstories'%(story_type), None)
+    stories_list = results[:limit]
+    
+    stories = []
 
-	for story_id in stories_list:
-		story = firebase.get("/v0/item/%s"%(story_id), None)
-		story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story_id)
-		utc_time = datetime.utcfromtimestamp(story['time'])
-		story['datetime'] = utc_time.strftime("%Y-%m-%d")
-		# Only include news stories, not HN discussions
-		if story_type == 'top' or story_type == 'best':
-			if 'url' in story and story['type'] == 'story':
-				stories.append(story)
-				story['image_url'] = get_og_img(story['url'])
-		else:
-			# Note: Job type does not have descendants
-			stories.append(story)
-	
-	return stories
+    for story_id in stories_list:
+        story = firebase.get("/v0/item/%s"%(story_id), None)
+        story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story_id)
+        utc_time = datetime.utcfromtimestamp(story['time'])
+        story['datetime'] = utc_time.strftime("%Y-%m-%d")
+        # Only include news stories, not HN discussions
+        if story_type == 'top' or story_type == 'best':
+            if 'url' in story and story['type'] == 'story':
+                stories.append(story)
+                story['image_url'] = get_og_img(story['url'])
+        else:
+            # Note: Job type does not have descendants
+            stories.append(story)
+    
+    return stories
 
 def stories_from_search(query, page=1):
-	if page <= 1:
-		page_param = ""
-	else:
-		page_param = "&page=%s"%(page)
+    if page <= 1:
+        page_param = ""
+    else:
+        page_param = "&page=%s"%(page)
 
-	url = "http://hn.algolia.com/api/v1/search?query=%s&tags=story"%(query)
-	url += page_param
+    url = "http://hn.algolia.com/api/v1/search?query=%s&tags=story"%(query)
+    url += page_param
 
-	r = requests.get(url)
-	if r.status_code != requests.codes.ok:
-		print r.text
-		return
-	stories_list = json.loads(r.content)['hits'][:LIMIT]
+    r = requests.get(url)
+    if r.status_code != requests.codes.ok:
+        print r.text
+        return
+    stories_list = json.loads(r.content)['hits'][:LIMIT]
 
-	stories = []
+    stories = []
 
-	for story in stories_list:
-		story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story['objectID'])
-		utc_time = datetime.utcfromtimestamp(story['created_at_i'])
-		story['datetime'] = utc_time.strftime("%Y-%m-%d")
-		story['image_url'] = get_og_img(story['url'])
-		stories.append(story)
-	# pprint.pprint(stories_list[0])
-	print len(stories)
-	return stories
+    for story in stories_list:
+        story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story['objectID'])
+        utc_time = datetime.utcfromtimestamp(story['created_at_i'])
+        story['datetime'] = utc_time.strftime("%Y-%m-%d")
+        story['image_url'] = get_og_img(story['url'])
+        stories.append(story)
+    # pprint.pprint(stories_list[0])
+    print len(stories)
+    return stories
 
 def get_og_img(url):
-	img = ''
-	try:
-		header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+    img = ''
+    try:
+        header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
        'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
        'Accept-Encoding': 'none',
        'Accept-Language': 'en-US,en;q=0.8',
        'Connection': 'keep-alive'}
 
-		req = urllib2.Request(url, headers=header)
+        req = urllib2.Request(url, headers=header)
 
-		try:
-		    page = urllib2.urlopen(req)
-		except urllib2.HTTPError, e:
-		    print e.fp.read()
+        try:
+            page = urllib2.urlopen(req)
+        except urllib2.HTTPError, e:
+            print e.fp.read()
 
-		content = page.read()
+        content = page.read()
 
-		soup = BeautifulSoup(content, "html.parser")
-		meta_tag = soup.select("meta[property='og:image']")
-		print "Meta:"
-		print meta_tag
-		
-		if len(meta_tag) > 0:
-			# found og:image
-			img = meta_tag[0]['content']
-			print "Yo"
-			print img
-		else:
-			meta_tag = soup.select("meta[name='twitter:image']")
-			if len(meta_tag) > 0:
-				img = meta_tag[0]['content']
-			else:
-				img_tag = soup.find_all("img")
+        soup = BeautifulSoup(content, "html.parser")
+        meta_tag = soup.select("meta[property='og:image']")
+        
+        if len(meta_tag) > 0:
+            # found og:image
+            img = meta_tag[0]['content']
+        else:
+            meta_tag = soup.select("meta[name='twitter:image']")
+            if len(meta_tag) > 0:
+                img = meta_tag[0]['content']
+            else:
+                img_tag = soup.find_all("img")
 
-				img = img_tag[0]['src'] if len(img_tag) > 0 else ''
-				if img != '' and 'http' not in img:
-					img = urljoin(url, img)
-	except Exception, e:
-		print e
+                img = img_tag[0]['src'] if len(img_tag) > 0 else ''
+                if img != '' and 'http' not in img:
+                    img = urljoin(url, img)
+    except Exception, e:
+        print e
 
-	return img
-		
+    return img
+        
 
 
 # =================== RESTful methods ==============
 def get_stories_rest(story_type='top', limit=9):
-	r = requests.get("/%sstories.json"%(story_type))
-	
-	if r.status_code != requests.codes.ok:
-		print r.text
-		return
-	stories_list = json.loads(r.content)[:limit]
-	stories = []
+    r = requests.get("/%sstories.json"%(story_type))
+    
+    if r.status_code != requests.codes.ok:
+        print r.text
+        return
+    stories_list = json.loads(r.content)[:limit]
+    stories = []
 
-	for story_id in stories_list:
-		item = requests.get("https://hacker-news.firebaseio.com/v0/item/%s.json"%(story_id))
-		story = json.loads(item.content)
-		story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story_id)
-		utc_time = datetime.utcfromtimestamp(story['time'])
-		story['datetime'] = utc_time.strftime("%Y-%m-%d")
-		story['image_url'] = get_og_img(story['url'])
+    for story_id in stories_list:
+        item = requests.get("https://hacker-news.firebaseio.com/v0/item/%s.json"%(story_id))
+        story = json.loads(item.content)
+        story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story_id)
+        utc_time = datetime.utcfromtimestamp(story['time'])
+        story['datetime'] = utc_time.strftime("%Y-%m-%d")
+        story['image_url'] = get_og_img(story['url'])
 
-		# Only include news stories, not HN discussions
-		if story_type == 'top' or story_type == 'best':
-			if 'url' in story and story['type'] == 'story':
-				stories.append(story)
-		else:
-			# Note: Job does not have descendants
-			stories.append(story)
-	return stories
+        # Only include news stories, not HN discussions
+        if story_type == 'top' or story_type == 'best':
+            if 'url' in story and story['type'] == 'story':
+                stories.append(story)
+        else:
+            # Note: Job does not have descendants
+            stories.append(story)
+    return stories
 
 
 """
@@ -159,16 +155,16 @@ For Show, Ask:
 Sample json result
 
 Object keys:
-	- by
-	- descendants
-	- hn_url
-	- id
-	- kids [ids, ids, ids, ...]
-	- score
-	- time
-	- title
-	- type
-	- url
+    - by
+    - descendants
+    - hn_url
+    - id
+    - kids [ids, ids, ids, ...]
+    - score
+    - time
+    - title
+    - type
+    - url
 
 
 Firebase item:
