@@ -9,6 +9,19 @@ application = Flask(__name__, instance_relative_config=True)
 application.config.from_object('config')
 application.config.from_pyfile('config.py', silent=True)	# Config for local development is found at: instance/config.py. This will overwrite configs in the previous line. The instance folder is ignored in .gitignore, so it won't be deployed to Heroku, in effect applying the production configs.
 
+logging.basicConfig()
+scheduler = BackgroundScheduler()
+scheduler.add_executor('processpool')
+# job = scheduler.add_job(send_daily_subscription, 'interval', seconds=10, id='job1')
+job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=2, minute=55, id='job1')
+try:
+	scheduler.start()
+	print "Scheduler started"
+except (KeyboardInterrupt, SystemExit):
+	scheduler.remove_job('job1')
+	scheduler.shutdown()
+
+
 app = application
 
 @app.route('/webhook', methods=['GET'])
