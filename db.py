@@ -68,7 +68,7 @@ def get_user(user_id):
 
 def update_user(user_id, field, value):
     query = "UPDATE users "\
-            "SET %s = %s" \
+            "SET %s = %s " \
             "WHERE facebook_user_id = %s "
     data = (field, value, user_id)
     try:
@@ -145,7 +145,7 @@ def get_cached_daily_subscription():
         conn.close()
 
 def get_all_subscriptions(active=True):
-    query = "SELECT keyword, GROUP_CONCAT(facebook_user_id) FROM subscriptions" \
+    query = "SELECT keyword, GROUP_CONCAT(facebook_user_id) FROM subscriptions " \
             "WHERE active=%s " \
             "GROUP BY keyword"
     args = (active, )
@@ -174,7 +174,7 @@ def get_all_subscriptions(active=True):
         conn.close()
 
 def get_subscribers_by_keyword(keyword):
-    query = "SELECT facebook_user_id FROM subscriptions" \
+    query = "SELECT facebook_user_id FROM subscriptions " \
             "WHERE keyword=%s"
     args = (keyword, )
     try:
@@ -186,8 +186,9 @@ def get_subscribers_by_keyword(keyword):
         # print('Total Row(s):', cursor.rowcount)
         subscribers = [] 
         
-        for row in rows:
-            subscribers.append(row[0])
+        if rows is not None:
+            for row in rows:
+                subscribers.append(row[0])
 
         return subscribers
 
@@ -249,7 +250,7 @@ def add_subscription(user_id, subscription_keyword):
 def remove_subscription(user_id, subscription_keyword):
     success = False
     query = "UPDATE subscriptions "\
-            "SET active = 0" \
+            "SET active = 0 " \
             "WHERE facebook_user_id = %s AND keyword = %s"
     args = (user_id, subscription_keyword)
 
