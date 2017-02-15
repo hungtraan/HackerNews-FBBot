@@ -218,24 +218,31 @@ def tick():
 	print('Tick! The time is: %s' % datetime.now())
 
 def send_daily_subscription():
-	# with app.app_context():
+	print "[Scheduled task] Sending daily subscription"
 	# ctx = app.test_request_context('https://2c85143c.ngrok.io/')
 	ctx = app.test_request_context('https://hacker-news-bot.herokuapp.com/')
 	ctx.push()
 
 	stories = DB.get_daily_subscription()
 	users = DB.get_subscribers_by_keyword('daily')
-	for user_id in users:
-		FB.send_message(token, sender_id, "Here are today's top stories:")
-		FB.send_stories(app.config['PAT'], user_id, stories)
+	
+	try:
+		for user_id in users:
+			FB.send_message(app.config['PAT'], user_id, "Here are today's top stories:")
+			FB.send_stories(app.config['PAT'], user_id, stories)
+
+	except Exception, e:
+		print(e)
+		traceback.print_exc()
 
 	ctx.pop()
+	print "[Scheduled task DONE] Sending daily subscription"
 
 
 # logging.basicConfig()
 scheduler = BackgroundScheduler()
 scheduler.add_executor('threadpool')
-job2 = scheduler.add_job(tick, 'interval', seconds=10, id='job2')
+# job2 = scheduler.add_job(tick, 'interval', seconds=10, id='job2')
 scheduler_hour = int(os.environ['SCHED_HOUR'])
 scheduler_min = int(os.environ['SCHED_MIN'])
 job = scheduler.add_job(send_daily_subscription, 'cron', hour=scheduler_hour, minute=scheduler_min, id='job1')
@@ -245,7 +252,7 @@ try:
 
 except (KeyboardInterrupt, SystemExit):
 	scheduler.remove_job('job1')
-	scheduler.remove_job('job2')
+	# scheduler.remove_job('job2')
 	scheduler.shutdown()
 
 # Allows running with simple `python <filename> <port>`
