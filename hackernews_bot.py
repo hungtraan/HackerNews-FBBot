@@ -1,9 +1,8 @@
-import sys, json, traceback
+import sys, json, traceback, os, logging
 import HN_API as HN, FacebookAPI as FB, NLP, db as DB
 from flask import Flask, request, current_app, url_for
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
-import logging
 
 application = Flask(__name__, instance_relative_config=True)
 application.config.from_object('config')
