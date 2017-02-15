@@ -242,7 +242,7 @@ scheduler_min = int(os.environ['SCHED_MIN'])
 job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=scheduler_hour, minute=scheduler_min, id='job1')
 try:
 	scheduler.start()
-	print "Scheduler started"
+	print "Scheduler started, will send at %s:%s"%(scheduler_hour, scheduler_min)
 
 except (KeyboardInterrupt, SystemExit):
 	scheduler.remove_job('job1')
