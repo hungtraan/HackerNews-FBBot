@@ -227,6 +227,7 @@ def send_daily_subscription():
 	stories = DB.get_daily_subscription()
 	users = DB.get_subscribers_by_keyword('daily')
 	for user_id in users:
+		FB.send_message(token, sender_id, "Here are today's top stories:")
 		FB.send_stories(app.config['PAT'], user_id, stories)
 
 	ctx.pop()
