@@ -235,7 +235,7 @@ def send_daily_subscription():
 # logging.basicConfig()
 scheduler = BackgroundScheduler()
 scheduler.add_executor('threadpool')
-# job = scheduler.add_job(send_daily_subscription, 'interval', seconds=10, id='job1')
+job2 = scheduler.add_job(tick, 'interval', seconds=10, id='job2')
 scheduler_hour = int(os.environ['SCHED_HOUR'])
 scheduler_min = int(os.environ['SCHED_MIN'])
 job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=scheduler_hour, minute=scheduler_min, id='job1')
@@ -245,6 +245,7 @@ try:
 
 except (KeyboardInterrupt, SystemExit):
 	scheduler.remove_job('job1')
+	scheduler.remove_job('job2')
 	scheduler.shutdown()
 
 # Allows running with simple `python <filename> <port>`
