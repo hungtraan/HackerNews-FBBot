@@ -232,32 +232,21 @@ def send_daily_subscription():
 	ctx.pop()
 
 
-logging.basicConfig()
+# logging.basicConfig()
 scheduler = BackgroundScheduler()
 scheduler.add_executor('processpool')
 # job = scheduler.add_job(send_daily_subscription, 'interval', seconds=10, id='job1')
-job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=2, minute=55, id='job1')
+job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=3, minute=03, id='job1')
 try:
 	scheduler.start()
 	print "Scheduler started"
+
 except (KeyboardInterrupt, SystemExit):
 	scheduler.remove_job('job1')
 	scheduler.shutdown()
 
 # Allows running with simple `python <filename> <port>`
 if __name__ == '__main__':
-	logging.basicConfig()
-	scheduler = BackgroundScheduler()
-	scheduler.add_executor('processpool')
-	# job = scheduler.add_job(send_daily_subscription, 'interval', seconds=10, id='job1')
-	job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=2, minute=51, id='job1')
-	try:
-		scheduler.start()
-		print "Scheduler started"
-	except (KeyboardInterrupt, SystemExit):
-		scheduler.remove_job('job1')
-		scheduler.shutdown()
-
 	if len(sys.argv) == 2: # Allow running on customized ports
 		app.run(port=int(sys.argv[1]))
 
