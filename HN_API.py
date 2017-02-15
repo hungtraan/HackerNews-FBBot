@@ -9,7 +9,7 @@ import urllib2
 firebase = firebase.FirebaseApplication('https://hacker-news.firebaseio.com', None)
 LIMIT = 9
 
-def get_stories(story_type='best', limit=LIMIT):
+def get_stories(story_type='top', limit=LIMIT):
     # r = requests.get("/%sstories.json"%(story_type))
     results = firebase.get('/v0/%sstories'%(story_type), None)
     stories_list = results[:limit]

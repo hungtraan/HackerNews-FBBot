@@ -1,1 +1,1 @@
-web: gunicorn hackernews_bot:app 
+web: gunicorn hackernews_bot:app
