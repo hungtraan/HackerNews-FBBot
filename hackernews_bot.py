@@ -234,9 +234,9 @@ def send_daily_subscription():
 
 # logging.basicConfig()
 scheduler = BackgroundScheduler()
-scheduler.add_executor('processpool')
+scheduler.add_executor('threadpool')
 # job = scheduler.add_job(send_daily_subscription, 'interval', seconds=10, id='job1')
-job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=3, minute=03, id='job1')
+job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=10, minute=00, id='job1')
 try:
 	scheduler.start()
 	print "Scheduler started"
