@@ -237,7 +237,9 @@ def send_daily_subscription():
 scheduler = BackgroundScheduler()
 scheduler.add_executor('threadpool')
 # job = scheduler.add_job(send_daily_subscription, 'interval', seconds=10, id='job1')
-job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=10, minute=00, id='job1')
+scheduler_hour = int(os.environ['SCHED_HOUR'])
+scheduler_min = int(os.environ['SCHED_MIN'])
+job = scheduler.add_job(send_daily_subscription, 'cron', day_of_week='mon-sun', hour=scheduler_hour, minute=scheduler_min, id='job1')
 try:
 	scheduler.start()
 	print "Scheduler started"
