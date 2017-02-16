@@ -24,9 +24,7 @@ def handle_verification():
 @app.route('/webhook', methods=['POST'])
 def handle_messages():
 	payload = request.get_data()
-
 	token = app.config['PAT']
-
 	webhook_type = get_type_from_payload(payload)
 
 	# Handle messages
@@ -73,7 +71,6 @@ def handle_messages():
 				if response is not None and response != 'pseudo':
 					# 'pseudo' is an "ok" signal for functions that sends response on their own
 					# without returning anything back this function
-					print response
 					FB.send_message(token, sender_id, response)
 
 				elif response != 'pseudo':
@@ -83,6 +80,7 @@ def handle_messages():
 				print e
 				traceback.print_exc()
 				FB.send_message(app.config['PAT'], sender_id, NLP.oneOf(NLP.error))
+
 	return "ok"
 
 def processIncoming(user_id, message):
@@ -91,12 +89,16 @@ def processIncoming(user_id, message):
 		if message_text == "news":
 			stories = DB.get_daily_subscription()
 			FB.send_stories(app.config['PAT'], user_id, stories)
+
 		elif message_text == "Subscribe":
 			return subscribe(user_id)
+
 		else:
 			FB.send_message(app.config['PAT'], user_id, "Just a sec, I'm looking that up...")
+			FB.show_typing(app.config['PAT'], user_id)
 			stories = HN.stories_from_search(message_text)
 			FB.send_stories(app.config['PAT'], user_id, stories)
+
 		return "pseudo"
 	# ==/ END Text message type =====================================================
 
@@ -243,8 +245,15 @@ def send_daily_subscription():
 scheduler = BackgroundScheduler()
 scheduler.add_executor('threadpool')
 # job2 = scheduler.add_job(tick, 'interval', seconds=10, id='job2')
-scheduler_hour = int(os.environ['SCHED_HOUR'])
-scheduler_min = int(os.environ['SCHED_MIN'])
+if os.environ['SCHED_HOUR']:
+	scheduler_hour = int(os.environ['SCHED_HOUR'])
+else:
+	scheduler_hour = 17
+if os.environ['SCHED_MIN']:
+	scheduler_min = int(os.environ['SCHED_MIN'])
+else:
+	scheduler_min = 0
+
 job = scheduler.add_job(send_daily_subscription, 'cron', hour=scheduler_hour, minute=scheduler_min, id='job1')
 try:
 	scheduler.start()

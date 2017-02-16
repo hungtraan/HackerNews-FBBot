@@ -1,4 +1,4 @@
-import requests, json
+import requests, json, traceback
 from flask import url_for
 
 def get_user_fb(token, user_id):
@@ -190,27 +190,34 @@ def send_stories(token, user_id, posts):
         return
         
     for post in posts:
-        img_url = post['image_url'] if 'image_url' in post and post['image_url'] != "" else url_for('static', filename='assets/img/empty-placeholder.jpg', _external=True)
-        votes = post['score'] if 'score' in post else post['points']
-        comments = post['descendants'] if 'descendants' in post else post['num_comments']
-        datetime = post['datetime']
-        obj = {
-            "title": post['title'],
-            "image_url": img_url,
-            "subtitle": "%s\n%s votes, %s comments"%(datetime, votes, comments),
-            "default_action": {
-                "type": "web_url",
-                "url": post['url'],
-            },
-            "buttons":[
-                {
-                    "type":"web_url",
-                    "url": post['hn_url'],
-                    "title":"Comments"
-                }
-            ]
-        }
-        options.append(obj) 
+        try:
+            img_url = post['image_url'] if 'image_url' in post and post['image_url'] != "" else url_for('static', filename='assets/img/empty-placeholder.jpg', _external=True)
+            votes = post['score'] if 'score' in post else post['points']
+            comments = post['descendants'] if 'descendants' in post else post['num_comments']
+            datetime = post['datetime']
+            obj = {
+                "title": post['title'],
+                "image_url": img_url,
+                "subtitle": "%s\n%s votes, %s comments"%(datetime, votes, comments),
+                "default_action": {
+                    "type": "web_url",
+                    "url": post['url'],
+                },
+                "buttons":[
+                    {
+                        "type":"web_url",
+                        "url": post['hn_url'],
+                        "title":"Comments"
+                    }
+                ]
+            }
+            options.append(obj) 
+
+        except Exception, e:
+            print post
+            print(e)
+            traceback.print_exc()
+
     read_more = {
             "title": "Load more stories",
             "image_url": url_for('static', filename='assets/img/empty-placeholder.jpg', _external=True),
@@ -228,7 +235,6 @@ def send_stories(token, user_id, posts):
             ]
         }
     options.append(read_more)
-    print len(options)
 
     r = requests.post("https://graph.facebook.com/v2.6/me/messages",
                         params={"access_token": token},

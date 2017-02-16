@@ -1,9 +1,12 @@
-import json, requests, pprint
+import json, requests, pprint, urllib2
 from firebase import firebase
-from datetime import datetime
 from bs4 import BeautifulSoup
 from urlparse import urljoin
-import urllib2
+from flask import url_for
+
+from ago import human
+from datetime import timedelta
+from datetime import datetime
 
 
 firebase = firebase.FirebaseApplication('https://hacker-news.firebaseio.com', None)
@@ -20,12 +23,16 @@ def get_stories(story_type='top', limit=LIMIT):
         story = firebase.get("/v0/item/%s"%(story_id), None)
         story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story_id)
         utc_time = datetime.utcfromtimestamp(story['time'])
-        story['datetime'] = utc_time.strftime("%Y-%m-%d")
+        # story['datetime'] = utc_time.strftime("%Y-%m-%d")
+        story['datetime'] = get_human_time(utc_time)
         # Only include news stories, not HN discussions
         if story_type == 'top' or story_type == 'best':
             if 'url' in story and story['type'] == 'story':
-                stories.append(story)
+                if story['url'] == '' or story['url'] is None:
+                    story['url'] = story['hn_url']
                 story['image_url'] = get_og_img(story['url'])
+                stories.append(story)
+                
         else:
             # Note: Job type does not have descendants
             stories.append(story)
@@ -52,29 +59,33 @@ def stories_from_search(query, page=1):
     for story in stories_list:
         story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story['objectID'])
         utc_time = datetime.utcfromtimestamp(story['created_at_i'])
-        story['datetime'] = utc_time.strftime("%Y-%m-%d")
+        story['datetime'] = get_human_time(utc_time)
+        if story['url'] == '' or story['url'] is None:
+            story['url'] = story['hn_url']
         story['image_url'] = get_og_img(story['url'])
         stories.append(story)
-    # pprint.pprint(stories_list[0])
-    print len(stories)
+    # pprint.pprint(stories_list)
+    
     return stories
 
 def get_og_img(url):
-    img = ''
+
+    fallback_img = url_for('static', filename="assets/img/empty-placeholder.jpg", _external=True)
+    img = fallback_img
     try:
         header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
-       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-       'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
-       'Accept-Encoding': 'none',
-       'Accept-Language': 'en-US,en;q=0.8',
-       'Connection': 'keep-alive'}
+           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+           'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+           'Accept-Encoding': 'none',
+           'Accept-Language': 'en-US,en;q=0.8',
+           'Connection': 'keep-alive'}
 
         req = urllib2.Request(url, headers=header)
 
-        try:
-            page = urllib2.urlopen(req)
-        except urllib2.HTTPError, e:
-            print e.fp.read()
+        # try:
+        page = urllib2.urlopen(req)
+        # except urllib2.HTTPError, e:
+        #     print e.fp.read()
 
         content = page.read()
 
@@ -116,7 +127,7 @@ def get_stories_rest(story_type='top', limit=9):
         story = json.loads(item.content)
         story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story_id)
         utc_time = datetime.utcfromtimestamp(story['time'])
-        story['datetime'] = utc_time.strftime("%Y-%m-%d")
+        story['datetime'] = get_human_time(utc_time)
         story['image_url'] = get_og_img(story['url'])
 
         # Only include news stories, not HN discussions
@@ -128,6 +139,9 @@ def get_stories_rest(story_type='top', limit=9):
             stories.append(story)
     return stories
 
+def get_human_time(time):
+    ts = datetime.now() - time
+    return human(ts, precision=1)
 
 """
 To do:
