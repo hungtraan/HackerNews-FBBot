@@ -300,7 +300,7 @@ else:
 	interval = 30
 
 job1 = scheduler.add_job(send_daily_subscription, 'cron', hour=scheduler_hour, minute=scheduler_min, id='job1')
-job2 = scheduler.add_job(send_daily_subscription, 'interval', minutes=interval, id='job2')
+job2 = scheduler.add_job(daily_stories_refresher, 'interval', minutes=interval, id='job2')
 try:
 	scheduler.start()
 	print "Scheduler started"
