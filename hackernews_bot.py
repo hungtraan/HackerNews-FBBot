@@ -86,11 +86,13 @@ def handle_messages():
 def processIncoming(user_id, message):
 	if message['type'] == 'text':
 		message_text = message['data']
-		if message_text == "news":
+		if message_text.lower() == "news":
+			FB.mark_seen(app.config['PAT'], user_id)
+			FB.send_message(app.config['PAT'], user_id, "Just a sec, I'm fetching today's stories...")
 			stories = DB.get_daily_subscription()
 			FB.send_stories(app.config['PAT'], user_id, stories)
 
-		elif message_text == "Subscribe":
+		elif message_text.lower() == "subscribe":
 			return subscribe(user_id)
 
 		else:
@@ -245,11 +247,11 @@ def send_daily_subscription():
 scheduler = BackgroundScheduler()
 scheduler.add_executor('threadpool')
 # job2 = scheduler.add_job(tick, 'interval', seconds=10, id='job2')
-if os.environ['SCHED_HOUR']:
+if 'SCHED_HOUR' in os.environ:
 	scheduler_hour = int(os.environ['SCHED_HOUR'])
 else:
 	scheduler_hour = 17
-if os.environ['SCHED_MIN']:
+if 'SCHED_MIN' in os.environ:
 	scheduler_min = int(os.environ['SCHED_MIN'])
 else:
 	scheduler_min = 0

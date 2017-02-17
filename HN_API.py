@@ -140,7 +140,7 @@ def get_stories_rest(story_type='top', limit=9):
     return stories
 
 def get_human_time(time):
-    ts = datetime.now() - time
+    ts = datetime.utcnow() - time
     return human(ts, precision=1)
 
 """

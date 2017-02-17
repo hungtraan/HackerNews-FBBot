@@ -89,27 +89,35 @@ def update_user(user_id, field, value):
 def get_users_with_subscriptions(subscription_keyword):
     pass
 
-def get_daily_subscription():
+def get_daily_subscription(limit=0):
     cached = get_cached_daily_subscription()
     if cached is not None:
-        return json.loads(cached[0])
+        stories = json.loads(cached[0])
+        if limit:
+            return stories[:limit]
+        else:
+            return stories
     else:
         news = HN.get_stories()
-        news = json.dumps(news)
+        news_insert = json.dumps(news)
         # news = [1,2,3]
 
         query = "INSERT INTO daily_stories " \
             "(date, data) " \
             "VALUES (%s, %s)"
         today = datetime.date(datetime.now())
-        args = (today, news)
+        args = (today, news_insert)
 
         try:
             conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
             cursor = conn.cursor()
             cursor.execute(query, args)
             conn.commit()
-            return news
+            if limit:
+                return news[:limit]
+            else:
+                return news
+            # return news
 
         except Exception, e:
             print(e)

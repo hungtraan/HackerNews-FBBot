@@ -23,6 +23,17 @@ def show_typing(token, user_id, action='typing_on'):
     if r.status_code != requests.codes.ok:
         print r.text
 
+def mark_seen(token, user_id, action='mark_seen'):
+    r = requests.post("https://graph.facebook.com/v2.6/me/messages",
+                        params={"access_token": token},
+                        data=json.dumps({
+                            "recipient": {"id": user_id},
+                            "sender_action": action
+                        }),
+                        headers={'Content-type': 'application/json'})
+    if r.status_code != requests.codes.ok:
+        print r.text
+
 def send_message(token, user_id, text):
     """Send the message text to recipient with id recipient.
     """
@@ -198,7 +209,7 @@ def send_stories(token, user_id, posts):
             obj = {
                 "title": post['title'],
                 "image_url": img_url,
-                "subtitle": "%s\n%s votes, %s comments"%(datetime, votes, comments),
+                "subtitle": "%s points | %s comments | %s"%(votes, comments, datetime),
                 "default_action": {
                     "type": "web_url",
                     "url": post['url'],
@@ -206,15 +217,21 @@ def send_stories(token, user_id, posts):
                 "buttons":[
                     {
                         "type":"web_url",
+                        "url": post['url'],
+                        "title":"Read story",
+                    },
+                    {
+                        "type":"web_url",
                         "url": post['hn_url'],
-                        "title":"Comments"
+                        "title":"HN Comments",
+                        "webview_height_ratio": "tall",
                     }
                 ]
             }
             options.append(obj) 
 
         except Exception, e:
-            print post
+            print posts
             print(e)
             traceback.print_exc()
 
@@ -235,7 +252,7 @@ def send_stories(token, user_id, posts):
             ]
         }
     options.append(read_more)
-
+    # print len(options)
     r = requests.post("https://graph.facebook.com/v2.6/me/messages",
                         params={"access_token": token},
                         data=json.dumps({
@@ -244,9 +261,8 @@ def send_stories(token, user_id, posts):
                                 "attachment":{
                                     "type":"template",
                                     "payload":{
-                                       # "template_type": "list",
-                                        # "top_element_style": "compact",
                                         "template_type":"generic",
+                                       # "template_type": "list",
                                         "elements": options
                                     }
                                 }
