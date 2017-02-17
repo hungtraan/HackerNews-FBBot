@@ -117,8 +117,7 @@ def sayByeTimeZone(user):
 # input: g.user
 def recentChat(user):
     last_seen = user['last_seen'] 
-    timestamp = datetime.strptime(last_seen,"%Y-%m-%d %H:%M:%S")
-    time_since_chat = datetime.now() - timestamp
+    time_since_chat = datetime.now() - last_seen
     recent60min = timedelta(minutes=60)
     if time_since_chat < recent60min:
         return True
@@ -130,7 +129,7 @@ def getUserTime(user):
     user_tz = user['timezone']
     offset = time.timezone if (time.localtime().tm_isdst == 0) else time.altzone
     server_tz = offset / 60 / 60 * -1
-    time_diff = user_tz - server_tz
+    time_diff = int(user_tz) - server_tz
     server_now = datetime.now()
     return server_now + timedelta(hours=time_diff)
 

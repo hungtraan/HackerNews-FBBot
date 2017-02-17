@@ -8,6 +8,10 @@ from ago import human
 from datetime import timedelta
 from datetime import datetime
 
+try:
+    ERROR_IMG = url_for('static', filename='assets/img/empty-placeholder.jpg', _external=True)
+except Exception, e:
+    ERROR_IMG = 'https://hacker-news-bot.herokuapp.com/static/assets/img/empty-placeholder.jpg'
 
 firebase = firebase.FirebaseApplication('https://hacker-news.firebaseio.com', None)
 LIMIT = 9
@@ -39,15 +43,10 @@ def get_stories(story_type='top', limit=LIMIT):
     
     return stories
 
-def stories_from_search(query, page=1):
-    if page <= 1:
-        page_param = ""
-    else:
-        page_param = "&page=%s"%(page)
-
+def stories_from_search(query):
+    
     url = "http://hn.algolia.com/api/v1/search?query=%s&tags=story"%(query)
-    url += page_param
-
+    
     r = requests.get(url)
     if r.status_code != requests.codes.ok:
         print r.text
@@ -70,7 +69,12 @@ def stories_from_search(query, page=1):
 
 def get_og_img(url):
 
-    fallback_img = url_for('static', filename="assets/img/empty-placeholder.jpg", _external=True)
+    try:
+        fallback_img = url_for('static', filename="assets/img/empty-placeholder.jpg", _external=True)
+
+    except Exception, e:
+        fallback_img = ERROR_IMG
+
     img = fallback_img
     try:
         header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',

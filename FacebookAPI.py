@@ -1,6 +1,11 @@
 import requests, json, traceback
 from flask import url_for
 
+try:
+    ERROR_IMG = url_for('static', filename='assets/img/empty-placeholder.jpg', _external=True)
+except Exception, e:
+    ERROR_IMG = 'https://hacker-news-bot.herokuapp.com/static/assets/img/empty-placeholder.jpg'
+
 def get_user_fb(token, user_id):
     r = requests.get("https://graph.facebook.com/v2.6/" + user_id,
                     params={"fields": "first_name,last_name,profile_pic,locale,timezone,gender"
@@ -82,16 +87,16 @@ def send_picture(token, user_id, imageUrl, title="", subtitle=""):
     if r.status_code != requests.codes.ok:
         print r.text    
 
-def send_quick_replies_yelp_search(token, user_id):
+def send_subscription_offer(token, user_id):
     # options = [Object {name:value, url:value}, Object {name:value, url:value}]
     quickRepliesOptions = [
         {"content_type":"text",
-         "title": "Get more suggestions",
-         "payload": 'yelp-more-yes'
+         "title": "Subscribe to daily updates (5PM PST - 8PM EST)",
+         "payload": 'SUBSCRIBE_DAILY_PAYLOAD'
         },
         {"content_type":"text",
-         "title": "That's good for me",
-         "payload": 'yelp-more-no'
+         "title": "No thanks",
+         "payload": 'NO_PAYLOAD'
         }
     ]
     data = json.dumps({
@@ -202,7 +207,7 @@ def send_stories(token, user_id, posts):
         
     for post in posts:
         try:
-            img_url = post['image_url'] if 'image_url' in post and post['image_url'] != "" else url_for('static', filename='assets/img/empty-placeholder.jpg', _external=True)
+            img_url = post['image_url'] if 'image_url' in post and post['image_url'] != "" else ERROR_IMG
             votes = post['score'] if 'score' in post else post['points']
             comments = post['descendants'] if 'descendants' in post else post['num_comments']
             datetime = post['datetime']
@@ -237,7 +242,7 @@ def send_stories(token, user_id, posts):
 
     read_more = {
             "title": "Load more stories",
-            "image_url": url_for('static', filename='assets/img/empty-placeholder.jpg', _external=True),
+            "image_url": ERROR_IMG,
             "subtitle": "",
             "default_action": {
                 "type": "web_url",

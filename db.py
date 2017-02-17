@@ -1,12 +1,71 @@
 from mysql.connector import MySQLConnection, Error
-import json, sys, traceback, FacebookAPI as FB, HN_API as HN
+import os, json, sys, traceback, FacebookAPI as FB, HN_API as HN
 from datetime import datetime
 from flask import current_app as app
+import urlparse
+import pylibmc
 
-HOST = 'us-cdbr-iron-east-04.cleardb.net'
-USERNAME = 'b3333c6f779dde'
-PASSWORD = 'b10bfad4'
-DB = 'heroku_72ea7ac5f998832'
+
+# --------- Setting up MySQL database info ---------
+# Register database schemes in URLs.
+urlparse.uses_netloc.append('mysql')
+
+DB = {}
+try:
+    if 'CLEARDB_DATABASE_URL' in os.environ:
+        url = urlparse.urlparse(os.environ['CLEARDB_DATABASE_URL'])
+        DB['HOST'] = url.hostname
+        DB['USERNAME'] = url.username
+        DB['PASSWORD'] = url.password
+        DB['DB'] = url.path[1:]
+        DB['PORT'] = url.port
+
+except Exception:
+    print 'Unexpected error:', sys.exc_info()
+
+def get_mysql_connection():
+    conn = MySQLConnection(host=DB['HOST'],
+        database=DB['DB'],
+        user=DB['USERNAME'],
+        password=DB['PASSWORD'])
+    return conn
+# /--------- END Setting up database info ---------
+
+# --------- Setting up Memcached ---------
+
+Memcached = {}
+
+def get_memcached_connection():
+    Memcached['servers'] = os.environ.get('MEMCACHIER_SERVERS', '').split(',')
+    Memcached['user'] = os.environ.get('MEMCACHIER_USERNAME', '')
+    Memcached['password'] = os.environ.get('MEMCACHIER_PASSWORD', '')
+    
+    MemcachedClient = pylibmc.Client(Memcached['servers'], binary=True,
+                        username=Memcached['user'], password=Memcached['password'],
+                        behaviors={
+                          # Faster IO
+                          "tcp_nodelay": True,
+
+                          # Keep connection alive
+                          'tcp_keepalive': True,
+
+                          # Timeout for set/get requests
+                          'connect_timeout': 2000, # ms
+                          'send_timeout': 750 * 1000, # us
+                          'receive_timeout': 750 * 1000, # us
+                          '_poll_timeout': 2000, # ms
+
+                          # Better failover
+                          'ketama': True,
+                          'remove_failed': 1,
+                          'retry_timeout': 2,
+                          'dead_timeout': 30,
+                        })
+    return MemcachedClient
+
+MemcachedClient = get_memcached_connection()
+# --------- Setting up Memcached ---------
+
 
 def create_user(user_id, user):
     query = "INSERT INTO users " \
@@ -17,7 +76,7 @@ def create_user(user_id, user):
     args = (user_id, user['first_name'],user['last_name'],user['profile_pic'],user['locale'],user['timezone'],user['gender'],"1970-01-01 00:00:00",timestamp)
     
     try:
-        conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
+        conn = get_mysql_connection()
         cursor = conn.cursor()
         cursor.execute(query, args) 
         conn.commit()
@@ -33,7 +92,7 @@ def get_user(user_id):
     query = "SELECT * FROM users WHERE facebook_user_id=%s"
     args = (user_id,)
     try:
-        conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
+        conn = get_mysql_connection()
         cursor = conn.cursor()
         cursor.execute(query, args)
 
@@ -72,7 +131,7 @@ def update_user(user_id, field, value):
             "WHERE facebook_user_id = %s "
     data = (field, value, user_id)
     try:
-        conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
+        conn = get_mysql_connection()
         cursor = conn.cursor()
         cursor.execute(query, data)
         conn.commit()
@@ -89,46 +148,65 @@ def update_user(user_id, field, value):
 def get_users_with_subscriptions(subscription_keyword):
     pass
 
-def get_daily_subscription(limit=0):
-    cached = get_cached_daily_subscription()
-    if cached is not None:
-        stories = json.loads(cached[0])
+def get_daily_top_stories(limit=0):
+    stories = None
+    stories = get_cached_daily_subscription_memcached()
+    if stories is not None:
         if limit:
             return stories[:limit]
         else:
             return stories
+
+    # Cached stories does not exist, get stories from HN and set in cache
     else:
         news = HN.get_stories()
-        news_insert = json.dumps(news)
-        # news = [1,2,3]
+        cache_today_stories_memcached(news)
+        
+        if limit:
+            return news[:limit]
+        else:
+            return news
+        # return news
 
-        query = "INSERT INTO daily_stories " \
-            "(date, data) " \
-            "VALUES (%s, %s)"
-        today = datetime.date(datetime.now())
-        args = (today, news_insert)
+def cache_today_stories_mysql(news=None):
+    #@input: news = list of dicts
+    if news is None:
+        news = HN.get_stories()
 
-        try:
-            conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
-            cursor = conn.cursor()
-            cursor.execute(query, args)
-            conn.commit()
-            if limit:
-                return news[:limit]
-            else:
-                return news
-            # return news
+    news_insert = json.dumps(news)
+    query = "INSERT INTO daily_stories " \
+        "(date, data) " \
+        "VALUES (%s, %s)"
+    today = datetime.date(datetime.now())
+    args = (today, news_insert)
 
-        except Exception, e:
-            print(e)
-            traceback.print_exc()
+    try:
+        conn = get_mysql_connection()
+        cursor = conn.cursor()
+        cursor.execute(query, args)
+        conn.commit()
+
+    except Exception, e:
+        print(e)
+        traceback.print_exc()
+
+    finally:
+        cursor.close()
+        conn.close()
+
+def cache_today_stories_memcached(news=None, story_type='top'):
+    if news is None:
+        news = HN.get_stories()
+        
+    try:
+        key = "today_stories_%s"%(story_type)
+        MemcachedClient.set(key, news, time=2000) # 3600 expiry time in SECONDS
+    except Exception, e:
+        print(e)
+        traceback.print_exc()
 
 
-        finally:
-            cursor.close()
-            conn.close()
-
-def get_cached_daily_subscription():
+def get_cached_daily_subscription_mysql():
     query = "SELECT data " \
         "FROM daily_stories " \
         "WHERE date=%s"
@@ -136,7 +214,7 @@ def get_cached_daily_subscription():
     args = (today,)
 
     try:
-        conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
+        conn = get_mysql_connection()
         cursor = conn.cursor()
         cursor.execute(query, args)
         news = cursor.fetchone()
@@ -147,18 +225,26 @@ def get_cached_daily_subscription():
         print(e)
         traceback.print_exc()
 
-
     finally:
         cursor.close()
         conn.close()
 
-def get_all_subscriptions(active=True):
+def get_cached_daily_subscription_memcached(story_type='top'):
+    try:
+        key = "today_stories_%s"%(story_type)
+        return MemcachedClient.get(key)
+        
+    except Exception, e:
+        print(e)
+        traceback.print_exc()
+
+def get_all_subscriptions(active=1):
     query = "SELECT keyword, GROUP_CONCAT(facebook_user_id) FROM subscriptions " \
             "WHERE active=%s " \
             "GROUP BY keyword"
     args = (active, )
     try:
-        conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
+        conn = get_mysql_connection()
         cursor = conn.cursor()
         cursor.execute(query, args)
 
@@ -183,10 +269,10 @@ def get_all_subscriptions(active=True):
 
 def get_subscribers_by_keyword(keyword):
     query = "SELECT facebook_user_id FROM subscriptions " \
-            "WHERE keyword=%s"
+            "WHERE keyword=%s AND active=1"
     args = (keyword, )
     try:
-        conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
+        conn = get_mysql_connection()
         cursor = conn.cursor()
         cursor.execute(query, args)
 
@@ -221,7 +307,7 @@ def add_subscription(user_id, subscription_keyword):
     exist_args = (user_id, subscription_keyword)
 
     try:
-        conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
+        conn = get_mysql_connection()
         cursor = conn.cursor()
         cursor.execute(exist_query, exist_args) 
         row = cursor.fetchone()
@@ -263,7 +349,7 @@ def remove_subscription(user_id, subscription_keyword):
     args = (user_id, subscription_keyword)
 
     try:
-        conn = MySQLConnection(host=HOST,database=DB,user=USERNAME,password=PASSWORD)
+        conn = get_mysql_connection()
         cursor = conn.cursor()
         cursor.execute(query, args) 
         conn.commit()
@@ -282,10 +368,3 @@ def update_last_seen(user_id):
     now = datetime.now()
     timestamp = datetime.strftime(now,"%Y-%m-%d %H:%M:%S")
     update_user(user_id, 'last_seen', timestamp)
-
-
-
-"""
-db heroku_72ea7ac5f998832
-mysql://b3333c6f779dde:b10bfad4@us-cdbr-iron-east-04.cleardb.net/heroku_72ea7ac5f998832?reconnect=true
-"""

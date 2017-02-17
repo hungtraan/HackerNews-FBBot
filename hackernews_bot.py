@@ -33,22 +33,20 @@ def handle_messages():
 
 			# Get user from DB
 			user = DB.get_user(sender_id)
+			response = None
 
 			if postback_payload == 'HELP_PAYLOAD':
 				handle_help(sender_id)
 
-			if postback_payload == 'GET_STARTED':				
+			elif postback_payload == 'GET_STARTED':				
 				handle_first_time_user(user)
-				offer_subscription(sender_id)
+				first_time_subscribe(sender_id)
 				
 			elif postback_payload == 'SUBSCRIBE_DAILY_PAYLOAD':
-				response = subscribe('daily', sender_id)
+				response = subscribe(sender_id, 'daily')
 				
-			elif postback_payload == 'SUBSCRIBE_WEEKLY_PAYLOAD':
-				response = subscribe('weekly', sender_id)
-
-			elif postback_payload == 'UNSUBSCRIBE_WEEKLY_PAYLOAD':
-				response = unsubscribe(sender_id)
+			elif postback_payload == 'UNSUBSCRIBE_DAILY_PAYLOAD':
+				response = unsubscribe(sender_id, 'daily')
 
 			if response:
 				FB.send_message(token, sender_id, response)
@@ -89,17 +87,17 @@ def processIncoming(user_id, message):
 		if message_text.lower() == "news":
 			FB.mark_seen(app.config['PAT'], user_id)
 			FB.send_message(app.config['PAT'], user_id, "Just a sec, I'm fetching today's stories...")
-			stories = DB.get_daily_subscription()
+			stories = DB.get_daily_top_stories()
 			FB.send_stories(app.config['PAT'], user_id, stories)
-
-		elif message_text.lower() == "subscribe":
-			return subscribe(user_id)
 
 		else:
 			FB.send_message(app.config['PAT'], user_id, "Just a sec, I'm looking that up...")
 			FB.show_typing(app.config['PAT'], user_id)
 			stories = HN.stories_from_search(message_text)
-			FB.send_stories(app.config['PAT'], user_id, stories)
+			if len(stories):
+				FB.send_stories(app.config['PAT'], user_id, stories)
+			else:
+				return "I can't find any result for that"
 
 		return "pseudo"
 	# ==/ END Text message type =====================================================
@@ -113,7 +111,7 @@ def processIncoming(user_id, message):
 
 	# Audio message type =========================================================
 	elif message['type'] == 'audio':
-		audio_url = message['data']
+		audNO_url = message['data']
 		return "I've received your voice message" #%s"%(audio_url)
 
 	# ==/ End Audio message type ====================================================
@@ -189,12 +187,20 @@ def messaging_events(payload):
 
 
 def handle_help(user_id):
-	intro = "I am your daily HackerNews aggregator"
+	intro = "I am your smart HackerNews bot"
 	FB.send_message(app.config['PAT'], user_id, intro)
-	FB.send_intro_screenshots(app, app.config['PAT'], user_id)
+
+	offer2 = "You can Subscribe (in my Menu) to receive daily updates at 5PM (PST) - 8PM (EST)"
+	FB.send_message(app.config['PAT'], user_id, offer2)
+
+	offer3 = "Send me any text to search for it on HackerNews"
+	FB.send_message(app.config['PAT'], user_id, offer3)
+	
+	offer4 = "Subscribing to a term will also be supported"
+	FB.send_message(app.config['PAT'], user_id, offer4)
 
 def handle_first_time_user(user):
-	user_id = user['user_id']
+	user_id = user['facebook_user_id']
 	token = app.config['PAT']
 
 	hi = "%s %s, nice to meet you :)"%(NLP.sayHiTimeZone(user), user['first_name'])
@@ -214,9 +220,28 @@ def unsubscribe(sender_id, keyword='daily'):
 	print("User %s unsubscribed from %s"%(sender_id, keyword))
 	if DB.remove_subscription(sender_id, keyword):
 		return "You're now unsubscribed from %s updates! :D"%(keyword)
-	
+
+def first_time_subscribe(user_id):
+	offer1 = subscribe(user_id, 'daily')
+	FB.send_message(app.config['PAT'], user_id, offer1)
+
+	offer3 = "You can unsubscribe anytime in my Menu (next to the text input)"
+	FB.send_message(app.config['PAT'], user_id, offer3)
+
+	offer4 = "Here's your first daily update of HackerNews top stories :D"
+	FB.send_message(app.config['PAT'], user_id, offer4)
+	FB.show_typing(app.config['PAT'], user_id)
+
+	stories = DB.get_daily_top_stories()
+	FB.send_stories(app.config['PAT'], user_id, stories)
+
 def get_all_subscriptions():
 	return DB.get_all_subscriptions()
+
+"""
+# This is the background scheduler to run daily update
+# Decoupled and moved to an independent worker with a blocking scheduler
+# >>> daily_stories_sender.py
 
 def tick():
 	print('Tick! The time is: %s' % datetime.now())
@@ -227,7 +252,7 @@ def send_daily_subscription():
 	ctx = app.test_request_context('https://hacker-news-bot.herokuapp.com/')
 	ctx.push()
 
-	stories = DB.get_daily_subscription()
+	stories = DB.get_daily_top_stories()
 	users = DB.get_subscribers_by_keyword('daily')
 	
 	try:
@@ -243,7 +268,7 @@ def send_daily_subscription():
 	print "[Scheduled task DONE] Sending daily subscription"
 
 
-# logging.basicConfig()
+logging.basicConfig()
 scheduler = BackgroundScheduler()
 scheduler.add_executor('threadpool')
 # job2 = scheduler.add_job(tick, 'interval', seconds=10, id='job2')
@@ -265,6 +290,7 @@ except (KeyboardInterrupt, SystemExit):
 	scheduler.remove_job('job1')
 	# scheduler.remove_job('job2')
 	scheduler.shutdown()
+"""
 
 # Allows running with simple `python <filename> <port>`
 if __name__ == '__main__':
