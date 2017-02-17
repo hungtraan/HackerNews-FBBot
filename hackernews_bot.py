@@ -242,11 +242,12 @@ def get_all_subscriptions():
 # This is the background scheduler to run daily update
 # Decoupled and moved to an independent worker with a blocking scheduler
 # >>> daily_stories_sender.py
-
+"""
 def tick():
 	print('Tick! The time is: %s' % datetime.now())
 
 def send_daily_subscription():
+	print "\n==========="
 	print "[Scheduled task] Sending daily subscription"
 	# ctx = app.test_request_context('https://2c85143c.ngrok.io/')
 	ctx = app.test_request_context('https://hacker-news-bot.herokuapp.com/')
@@ -268,6 +269,17 @@ def send_daily_subscription():
 	print "[Scheduled task DONE] Sending daily subscription"
 
 
+def daily_stories_refresher():
+    print "\n==========="
+    print "Starting caching process [1/2]: Top stories"
+    # print('This job is run every 15 minutes.')
+    DB.cache_today_stories_memcached(None, 'top')
+    print "Today's [top] stories cached\n"
+
+    print "Starting caching process [2/2]: Best stories"
+    DB.cache_today_stories_memcached(None, 'best')
+    print "Today's [best] stories cached"
+
 logging.basicConfig()
 scheduler = BackgroundScheduler()
 scheduler.add_executor('threadpool')
@@ -275,22 +287,31 @@ scheduler.add_executor('threadpool')
 if 'SCHED_HOUR' in os.environ:
 	scheduler_hour = int(os.environ['SCHED_HOUR'])
 else:
-	scheduler_hour = 17
+	scheduler_hour = 20
+
 if 'SCHED_MIN' in os.environ:
 	scheduler_min = int(os.environ['SCHED_MIN'])
 else:
 	scheduler_min = 0
 
-job = scheduler.add_job(send_daily_subscription, 'cron', hour=scheduler_hour, minute=scheduler_min, id='job1')
+if 'DAILY_STORIES_REFRESH_EVERY_X_MINUTES' in os.environ:
+	interval = int(os.environ['DAILY_STORIES_REFRESH_EVERY_X_MINUTES'])
+else:
+	interval = 30
+
+job1 = scheduler.add_job(send_daily_subscription, 'cron', hour=scheduler_hour, minute=scheduler_min, id='job1')
+job2 = scheduler.add_job(send_daily_subscription, 'interval', minutes=interval, id='job2')
 try:
 	scheduler.start()
-	print "Scheduler started, will send at %s:%s"%(scheduler_hour, scheduler_min)
+	print "Scheduler started"
+	print "Daily updates will send at %s:%s"%(scheduler_hour, scheduler_min)
+	print "Top/Best stories refreshes every %d min"%(interval)
 
 except (KeyboardInterrupt, SystemExit):
 	scheduler.remove_job('job1')
-	# scheduler.remove_job('job2')
+	scheduler.remove_job('job2')
 	scheduler.shutdown()
-"""
+
 
 # Allows running with simple `python <filename> <port>`
 if __name__ == '__main__':
