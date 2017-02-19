@@ -1,4 +1,4 @@
-import json, requests, pprint, urllib2
+import json, requests, pprint, urllib2, traceback
 from firebase import firebase
 from bs4 import BeautifulSoup
 from urlparse import urljoin
@@ -76,21 +76,18 @@ def get_og_img(url):
         fallback_img = ERROR_IMG
 
     img = fallback_img
+
     try:
-        header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
-           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-           'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
-           'Accept-Encoding': 'none',
-           'Accept-Language': 'en-US,en;q=0.8',
-           'Connection': 'keep-alive'}
 
-        req = urllib2.Request(url, headers=header)
-
-        # try:
-        page = urllib2.urlopen(req)
-        # except urllib2.HTTPError, e:
-        #     print e.fp.read()
-
+        headers = [('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11'),
+           ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
+           ('Accept-Charset', 'ISO-8859-1,utf-8;q=0.7,*;q=0.3'),
+           ('Accept-Encoding', 'none'),
+           ('Accept-Language', 'en-US,en;q=0.8'),
+           ('Connection', 'keep-alive')]
+        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor)
+        opener.addheaders = headers
+        page = opener.open(url)
         content = page.read()
 
         soup = BeautifulSoup(content, "html.parser")
@@ -110,7 +107,9 @@ def get_og_img(url):
                 if img != '' and 'http' not in img:
                     img = urljoin(url, img)
     except Exception, e:
+        print "[get_og_img] ERROR: %s"%(url)
         print e
+        traceback.print_exc()
 
     return img
         
