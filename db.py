@@ -1,6 +1,8 @@
 from mysql.connector import MySQLConnection, Error
 import os, json, sys, traceback, FacebookAPI as FB, HN_API as HN
 from datetime import datetime
+from sets import Set
+
 from flask import current_app as app
 import urlparse
 import pylibmc
@@ -168,6 +170,36 @@ def get_daily_top_stories(limit=0):
             return news
         # return news
 
+def get_stories_from_search(keyword, search_type="top", limit=0):
+    # @search_type: values either "top" or "recent"
+    keyword_with_type = keyword + "_%s"%(search_type)
+
+    stories = None
+    stories = get_cached_search_result(keyword_with_type)
+    if stories is not None:
+        if limit:
+            return stories[:limit]
+        else:
+            return stories
+
+    # Cached stories does not exist, get stories from HN and set in cache
+    else:
+        stories = HN.stories_from_search(keyword, search_type)
+        cache_stories(keyword_with_type, stories)
+
+        if limit:
+            return stories[:limit]
+        else:
+            return stories
+        
+def get_cached_search_result(keyword):
+    try:
+        return MemcachedClient.get(keyword)
+        
+    except Exception, e:
+        print(e)
+        traceback.print_exc()
+
 def cache_today_stories_mysql(news=None):
     #@input: news = list of dicts
     if news is None:
@@ -200,7 +232,20 @@ def cache_today_stories_memcached(news=None, story_type='top'):
         
     try:
         key = "today_stories_%s"%(story_type)
-        MemcachedClient.set(key, news, time=2000) # 3600 expiry time in SECONDS
+        MemcachedClient.set(key, news, time=2000) # 2000s - cache expiry time in SECONDS
+    except Exception, e:
+        print(e)
+        traceback.print_exc()
+
+def cache_stories(keyword, stories):
+    try:
+        MemcachedClient.set(keyword, stories, time=2000) # 2000s - cache expiry time in SECONDS
+        cached_keywords = MemcachedClient.get('cached_keywords')
+        if cached_keywords is None:
+            cached_keywords = Set()
+        cached_keywords.add(keyword)
+        MemcachedClient.set('cached_keywords', cached_keywords, time=172800) # 2-day expiry
+
     except Exception, e:
         print(e)
         traceback.print_exc()

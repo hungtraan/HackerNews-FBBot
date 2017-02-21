@@ -43,9 +43,9 @@ def get_stories(story_type='top', limit=LIMIT):
     
     return stories
 
-def stories_from_search(query):
-    
-    url = "http://hn.algolia.com/api/v1/search?query=%s&tags=story"%(query)
+def stories_from_search(query, search_type="top"):
+    search_type = 'search' if search_type=="top" else 'search_by_date'
+    url = "http://hn.algolia.com/api/v1/%s?query=%s&tags=story"%(search_type, query)
     
     r = requests.get(url)
     if r.status_code != requests.codes.ok:

@@ -1,4 +1,4 @@
-import sys, json, traceback, os, logging
+import sys, json, traceback, os, logging, threading
 import HN_API as HN, FacebookAPI as FB, NLP, db as DB
 from flask import Flask, request, current_app, url_for
 from datetime import datetime
@@ -62,17 +62,10 @@ def handle_messages():
 
 			# Start processing valid requests
 			try:
+				returns = {}
 				FB.show_typing(token, sender_id)
-				response = processIncoming(sender_id, message)
-				FB.show_typing(token, sender_id, 'typing_off')
-
-				if response is not None and response != 'pseudo':
-					# 'pseudo' is an "ok" signal for functions that sends response on their own
-					# without returning anything back this function
-					FB.send_message(token, sender_id, response)
-
-				elif response != 'pseudo':
-					FB.send_message(token, sender_id, "Sorry I don't understand that")
+				thr = threading.Thread(target=processIncoming, args=(sender_id, message), kwargs={})
+				thr.start() # will run "processIncoming" asynchronously
 
 			except Exception, e:
 				print e
@@ -82,43 +75,53 @@ def handle_messages():
 	return "ok"
 
 def processIncoming(user_id, message):
+	token = app.config['PAT']
 	if message['type'] == 'text':
 		message_text = message['data']
 		if message_text.lower() == "news":
-			FB.mark_seen(app.config['PAT'], user_id)
-			FB.send_message(app.config['PAT'], user_id, "Just a sec, I'm fetching today's stories...")
+			FB.send_message(token, user_id, "Just a sec, I'm fetching today's stories :D")
+			FB.show_typing(token, user_id)
 			stories = DB.get_daily_top_stories()
-			FB.send_stories(app.config['PAT'], user_id, stories)
+			FB.send_stories(token, user_id, stories)
 
 		else:
-			FB.send_message(app.config['PAT'], user_id, "Just a sec, I'm looking that up...")
-			FB.show_typing(app.config['PAT'], user_id)
-			stories = HN.stories_from_search(message_text)
-			if len(stories):
-				FB.send_stories(app.config['PAT'], user_id, stories)
-			else:
-				return "I can't find any result for that"
+			keyword = message_text.lower()
+			FB.show_typing(token, user_id, 'typing_off')
+			FB.send_message(token, user_id, "Just a sec, I'm looking \"%s\" up :D"%(message_text))
+			FB.show_typing(token, user_id)
+			stories = DB.get_stories_from_search(keyword, "top") # top results
+			stories_recent = DB.get_stories_from_search(keyword, "recent") # recent-first results
 
-		return "pseudo"
+			if len(stories):
+				FB.send_message(token, user_id, "Top stories related to \"%s\":"%(message_text))
+				FB.send_stories(token, user_id, stories)
+				FB.send_message(token, user_id, "Most recent stories related to \"%s\":"%(message_text))
+				FB.send_stories(token, user_id, stories_recent)
+			else:
+				error = "Sorry, I can't find any result on HN for that :("
+				FB.send_message(token, user_id, error)
+
 	# ==/ END Text message type =====================================================
 
 	# Location message type =========================================================
 	elif message['type'] == 'location':
 		response = "I've received location (%s,%s) (y)"%(message['data'][0],message['data'][1])
-		return response
-
+		FB.send_message(token, user_id, response)
+		
 	# ==/ END Location message type ==================================================
 
 	# Audio message type =========================================================
 	elif message['type'] == 'audio':
 		audNO_url = message['data']
-		return "I've received your voice message" #%s"%(audio_url)
+		response = "I've received your voice message" #%s"%(audio_url)
+		FB.send_message(token, user_id, response)
 
 	# ==/ End Audio message type ====================================================
 
 	# Unrecognizable incoming, remove context and reset all data to start afresh
 	else:
-		return "*scratch my head*"
+		error = "*scratch my head*"
+		FB.send_message(token, user_id, error)
 
 
 # Get type of webhook
