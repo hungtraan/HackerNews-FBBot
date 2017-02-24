@@ -239,7 +239,7 @@ def cache_today_stories_memcached(news=None, story_type='top'):
 
 def cache_stories(keyword, stories):
     try:
-        MemcachedClient.set(keyword, stories, time=2000) # 2000s - cache expiry time in SECONDS
+        MemcachedClient.set(keyword, stories, time=172800) # 2000s - cache expiry time in SECONDS
         cached_keywords = MemcachedClient.get('cached_keywords')
         if cached_keywords is None:
             cached_keywords = Set()
@@ -250,7 +250,31 @@ def cache_stories(keyword, stories):
         print(e)
         traceback.print_exc()
 
+def refresh_cached_searches():
+    cached_keywords = MemcachedClient.get('cached_keywords') # Set([])
+    search_term = ''
 
+    for keyword in cached_keywords:
+        search_type = "top"
+        if keyword[-4:] == "_top":
+            search_term = keyword[:-4]
+        elif keyword[-7:] == "_recent":
+            search_term = keyword[:-7]
+            search_type = "recent"
+
+        if search_term != '':
+            stories = HN.stories_from_search(search_term, search_type)
+            
+            try:
+                MemcachedClient.set(keyword, stories, time=172800)
+            
+            except Exception, e:
+                print "Error caching search term: %s"%(keyword)
+                print(e)
+                traceback.print_exc()
+
+    print "All searches cached"
+    
 def get_cached_daily_subscription_mysql():
     query = "SELECT data " \
         "FROM daily_stories " \

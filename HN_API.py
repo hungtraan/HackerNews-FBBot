@@ -1,4 +1,4 @@
-import json, requests, pprint, urllib2, traceback
+import json, requests, pprint, urllib2, traceback, StringIO, gzip
 from firebase import firebase
 from bs4 import BeautifulSoup
 from urlparse import urljoin
@@ -14,7 +14,7 @@ except Exception, e:
     ERROR_IMG = 'https://hacker-news-bot.herokuapp.com/static/assets/img/empty-placeholder.jpg'
 
 firebase = firebase.FirebaseApplication('https://hacker-news.firebaseio.com', None)
-LIMIT = 9
+LIMIT = 90
 
 def get_stories(story_type='top', limit=LIMIT):
     # r = requests.get("/%sstories.json"%(story_type))
@@ -40,7 +40,8 @@ def get_stories(story_type='top', limit=LIMIT):
         else:
             # Note: Job type does not have descendants
             stories.append(story)
-    
+        print "[Saved] %s"%(story['title'])
+        
     return stories
 
 def stories_from_search(query, search_type="top"):
@@ -51,7 +52,7 @@ def stories_from_search(query, search_type="top"):
     if r.status_code != requests.codes.ok:
         print r.text
         return
-    stories_list = json.loads(r.content)['hits'][:LIMIT]
+    stories_list = json.loads(r.content)['hits'][:9]
 
     stories = []
 
@@ -63,6 +64,7 @@ def stories_from_search(query, search_type="top"):
             story['url'] = story['hn_url']
         story['image_url'] = get_og_img(story['url'])
         stories.append(story)
+        print "[Saved] %s"%(story['title'])
     # pprint.pprint(stories_list)
     
     return stories
@@ -82,13 +84,14 @@ def get_og_img(url):
         headers = [('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11'),
            ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
            ('Accept-Charset', 'ISO-8859-1,utf-8;q=0.7,*;q=0.3'),
-           ('Accept-Encoding', 'none'),
+           ('Accept-Encoding', 'gzip,deflate'),
            ('Accept-Language', 'en-US,en;q=0.8'),
            ('Connection', 'keep-alive')]
         opener = urllib2.build_opener(urllib2.HTTPCookieProcessor)
         opener.addheaders = headers
-        page = opener.open(url)
-        content = page.read()
+        page = opener.open(url, timeout=3)
+        content = decode(page)
+        # content = data.read()
 
         soup = BeautifulSoup(content, "html.parser")
         meta_tag = soup.select("meta[property='og:image']")
@@ -105,7 +108,10 @@ def get_og_img(url):
 
                 img = img_tag[0]['src'] if len(img_tag) > 0 else ''
                 if img != '' and 'http' not in img:
+                    if 'data:image/' == img[:11]:
+                        return ERROR_IMG
                     img = urljoin(url, img)
+
     except Exception, e:
         print "[get_og_img] ERROR: %s"%(url)
         print e
@@ -113,7 +119,17 @@ def get_og_img(url):
 
     return img
         
+def decode (page):
+    encoding = page.info().get("Content-Encoding")    
+    if encoding in ('gzip', 'x-gzip', 'deflate'):
+        content = page.read()
+        if encoding == 'deflate':
+            data = StringIO.StringIO(zlib.decompress(content))
+        else:
+            data = gzip.GzipFile('', 'rb', 9, StringIO.StringIO(content))
+        page = data.read()
 
+    return page
 
 # =================== RESTful methods ==============
 def get_stories_rest(story_type='top', limit=9):

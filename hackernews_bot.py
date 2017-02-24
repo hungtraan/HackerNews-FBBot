@@ -48,6 +48,14 @@ def handle_messages():
 			elif postback_payload == 'UNSUBSCRIBE_DAILY_PAYLOAD':
 				response = unsubscribe(sender_id, 'daily')
 
+			elif postback_payload[:15] == 'MORE_daily_top_':
+				# Format: "MORE_%s_%s"%(story_type, offset)
+				# Format: "MORE_daily_top_9"
+				offset = int(postback_payload[15:])
+				print offset
+				stories = DB.get_daily_top_stories()
+				FB.send_stories(token, sender_id, stories, 'daily_top', offset)
+
 			if response:
 				FB.send_message(token, sender_id, response)
 
@@ -90,13 +98,15 @@ def processIncoming(user_id, message):
 			FB.send_message(token, user_id, "Just a sec, I'm looking \"%s\" up :D"%(message_text))
 			FB.show_typing(token, user_id)
 			stories = DB.get_stories_from_search(keyword, "top") # top results
-			stories_recent = DB.get_stories_from_search(keyword, "recent") # recent-first results
 
 			if len(stories):
 				FB.send_message(token, user_id, "Top stories related to \"%s\":"%(message_text))
-				FB.send_stories(token, user_id, stories)
+				FB.send_stories(token, user_id, stories, keyword)
+
+			stories_recent = DB.get_stories_from_search(keyword, "recent") # recent-first results
+			if len(stories_recent):
 				FB.send_message(token, user_id, "Most recent stories related to \"%s\":"%(message_text))
-				FB.send_stories(token, user_id, stories_recent)
+				FB.send_stories(token, user_id, stories_recent, keyword)
 			else:
 				error = "Sorry, I can't find any result on HN for that :("
 				FB.send_message(token, user_id, error)
@@ -258,7 +268,7 @@ def send_daily_subscription():
 
 	stories = DB.get_daily_top_stories()
 	users = DB.get_subscribers_by_keyword('daily')
-	
+	print stories
 	try:
 		for user_id in users:
 			FB.send_message(app.config['PAT'], user_id, "Here are today's top stories:")
@@ -272,7 +282,7 @@ def send_daily_subscription():
 	print "[Scheduled task DONE] Sending daily subscription"
 
 
-def daily_stories_refresher():
+def refresh_daily_stories():
     print "\n==========="
     print "Starting caching process [1/2]: Top stories"
     # print('This job is run every 15 minutes.')
@@ -282,6 +292,11 @@ def daily_stories_refresher():
     print "Starting caching process [2/2]: Best stories"
     DB.cache_today_stories_memcached(None, 'best')
     print "Today's [best] stories cached"
+
+def refresh_search_stories():
+    print "\n==========="
+    print "Starting search caching process"
+    DB.refresh_cached_searches()
 
 logging.basicConfig()
 scheduler = BackgroundScheduler()
@@ -302,17 +317,26 @@ if 'DAILY_STORIES_REFRESH_EVERY_X_MINUTES' in os.environ:
 else:
 	interval = 30
 
+if 'SEARCH_STORIES_REFRESH_EVERY_X_MINUTES' in os.environ:
+	interval_search = int(os.environ['SEARCH_STORIES_REFRESH_EVERY_X_MINUTES'])
+else:
+	interval_search = 30
+
 job1 = scheduler.add_job(send_daily_subscription, 'cron', hour=scheduler_hour, minute=scheduler_min, id='job1')
-job2 = scheduler.add_job(daily_stories_refresher, 'interval', minutes=interval, id='job2')
+job2 = scheduler.add_job(refresh_daily_stories, 'interval', minutes=interval, id='job2')
+job3 = scheduler.add_job(refresh_search_stories, 'interval', minutes=interval_search, id='job3')
+
 try:
 	scheduler.start()
 	print "Scheduler started"
 	print "Daily updates will send at %s:%s"%(scheduler_hour, scheduler_min)
 	print "Top/Best stories refreshes every %d min"%(interval)
+	print "Search stories refreshes every %d min"%(interval_search)
 
 except (KeyboardInterrupt, SystemExit):
 	scheduler.remove_job('job1')
 	scheduler.remove_job('job2')
+	scheduler.remove_job('job3')
 	scheduler.shutdown()
 
 

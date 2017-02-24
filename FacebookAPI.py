@@ -200,12 +200,16 @@ def send_intro_screenshots(app, token, user_id):
 def send_story(token, user_id, story):
     send_url(token, user_id, 'Link', story['title'], story['url'])
 
-def send_stories(token, user_id, posts):
+def send_stories(token, user_id, posts, story_type="daily_top", offset=0):
     options = []
     if posts is None:
         return
-        
-    for post in posts:
+
+    # Modified loop iteration to send different parts of story list
+    max_ite = offset+9 if len(posts)-offset > 9 else len(posts)-offset
+
+    for i in range(offset, max_ite):
+        post = posts[i]
         try:
             img_url = post['image_url'] if 'image_url' in post and post['image_url'] != "" else ERROR_IMG
             votes = post['score'] if 'score' in post else post['points']
@@ -240,20 +244,47 @@ def send_stories(token, user_id, posts):
             print(e)
             traceback.print_exc()
 
+    today_stories_button_more = {
+        # "type":"web_url",
+        # "url": "https://news.ycombinator.com/",
+        # "title":"More stories"
+        "type":"postback",
+        "title":"More stories",
+        "payload":"MORE_%s_%s"%(story_type, offset+9)
+    }
+
+    search_query = "https://hn.algolia.com/?query=%s"%(story_type)
+    search_button_more = {
+        "type":"web_url",
+        "url": search_query,
+        "title":"More search results",
+        "webview_height_ratio": "tall",
+    }
+
+    if story_type == "daily_top":
+        button = today_stories_button_more
+        default_button = {
+            "type":"postback",
+            "payload":"MORE_%s_%s"%(story_type, offset+9)
+        }
+    else:
+        button = search_button_more
+        default_button = {
+            "type":"web_url",
+            "url": search_query
+        }
     read_more = {
             "title": "Load more stories",
             "image_url": ERROR_IMG,
             "subtitle": "",
-            "default_action": {
+            "default_action":
+            {
                 "type": "web_url",
+                "webview_height_ratio": "tall",
                 "url": "https://news.ycombinator.com/",
             },
             "buttons":[
-                {
-                    "type":"web_url",
-                    "url": "https://news.ycombinator.com/",
-                    "title":"Load more"
-                }
+                button
             ]
         }
     options.append(read_more)
