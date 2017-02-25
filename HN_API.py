@@ -113,9 +113,11 @@ def get_og_img(url):
                 img_tag = soup.find_all("img")
 
                 img = img_tag[0]['src'] if len(img_tag) > 0 else ''
-                if img != '' and 'http' not in img:
+                if img[:2] == '//':
+                    img = "http:" + img
+                elif img != '' and 'http' not in img:
                     if 'data:image/' == img[:11]:
-                        return ERROR_IMG
+                        return ERROR_IMG                    
                     img = urljoin(url, img)
 
     except Exception, e:

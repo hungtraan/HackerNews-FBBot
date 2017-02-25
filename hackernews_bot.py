@@ -52,13 +52,11 @@ def handle_messages():
 				# Format: "MORE_%s_%s"%(story_type, offset)
 				# Format: "MORE_daily_top_9"
 				offset = int(postback_payload[15:])
-				print offset
-				stories = DB.get_daily_top_stories()
+				stories = DB.get_daily_stories()
 				FB.send_stories(token, sender_id, stories, 'daily_top', offset)
 
 			if response:
 				FB.send_message(token, sender_id, response)
-
 
 	elif webhook_type == 'message':
 		for sender_id, message in messaging_events(payload):
@@ -266,13 +264,16 @@ def send_daily_subscription():
 	ctx = app.test_request_context('https://hacker-news-bot.herokuapp.com/')
 	ctx.push()
 
-	stories = DB.get_daily_top_stories()
+	top_stories = DB.get_daily_stories("top")
+	best_stories = DB.get_daily_stories("best")
 	users = DB.get_subscribers_by_keyword('daily')
-	print stories
+
 	try:
 		for user_id in users:
 			FB.send_message(app.config['PAT'], user_id, "Here are today's top stories:")
-			FB.send_stories(app.config['PAT'], user_id, stories)
+			FB.send_stories(app.config['PAT'], user_id, top_stories)
+			FB.send_message(app.config['PAT'], user_id, "Here are today's best stories:")
+			FB.send_stories(app.config['PAT'], user_id, best_stories)
 
 	except Exception, e:
 		print(e)
@@ -305,7 +306,7 @@ scheduler.add_executor('threadpool')
 if 'SCHED_HOUR' in os.environ:
 	scheduler_hour = int(os.environ['SCHED_HOUR'])
 else:
-	scheduler_hour = 20
+	scheduler_hour = 17
 
 if 'SCHED_MIN' in os.environ:
 	scheduler_min = int(os.environ['SCHED_MIN'])
@@ -342,7 +343,7 @@ except (KeyboardInterrupt, SystemExit):
 
 # Allows running with simple `python <filename> <port>`
 if __name__ == '__main__':
-	refresh_daily_stories()
+	# send_daily_subscription()
 	if len(sys.argv) == 2: # Allow running on customized ports
 		app.run(port=int(sys.argv[1]))
 

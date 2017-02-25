@@ -150,9 +150,9 @@ def update_user(user_id, field, value):
 def get_users_with_subscriptions(subscription_keyword):
     pass
 
-def get_daily_top_stories(limit=0):
+def get_daily_stories(story_type="top", limit=0):
     stories = None
-    stories = get_cached_daily_subscription_memcached()
+    stories = get_cached_daily_subscription_memcached(story_type)
     if stories is not None:
         if limit:
             return stories[:limit]
@@ -161,8 +161,8 @@ def get_daily_top_stories(limit=0):
 
     # Cached stories does not exist, get stories from HN and set in cache
     else:
-        news = HN.get_stories()
-        cache_today_stories_memcached(news)
+        news = HN.get_stories(story_type)
+        cache_today_stories_memcached(news, story_type)
         
         if limit:
             return news[:limit]
@@ -274,7 +274,7 @@ def refresh_cached_searches():
                 traceback.print_exc()
 
     print "All searches cached"
-    
+
 def get_cached_daily_subscription_mysql():
     query = "SELECT data " \
         "FROM daily_stories " \

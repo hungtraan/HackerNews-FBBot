@@ -1,4 +1,5 @@
 import requests, json, traceback
+from urlparse import urljoin
 from flask import url_for
 
 try:
@@ -206,15 +207,24 @@ def send_stories(token, user_id, posts, story_type="daily_top", offset=0):
         return
 
     # Modified loop iteration to send different parts of story list
-    max_ite = offset+9 if len(posts)-offset > 9 else len(posts)-offset
-
+    max_ite = offset+9 if len(posts)-offset > 9 else len(posts)
+    no_more_stories = False if max_ite < len(posts) else True
+    
     for i in range(offset, max_ite):
         post = posts[i]
         try:
             img_url = post['image_url'] if 'image_url' in post and post['image_url'] != "" else ERROR_IMG
+            if img_url[:2] == '//':
+                img_url = "http:" + img_url
+            elif img_url != ERROR_IMG and img_url != '' and 'http' not in img_url:
+                if 'data:image/' == img_url[:11]:
+                    img_url = ERROR_IMG
+                else:
+                    img_url = urljoin(post['url'], img_url)    
             votes = post['score'] if 'score' in post else post['points']
             comments = post['descendants'] if 'descendants' in post else post['num_comments']
             datetime = post['datetime']
+            
             obj = {
                 "title": post['title'],
                 "image_url": img_url,
@@ -240,17 +250,19 @@ def send_stories(token, user_id, posts, story_type="daily_top", offset=0):
             options.append(obj) 
 
         except Exception, e:
-            print posts
             print(e)
             traceback.print_exc()
-
+            
     today_stories_button_more = {
-        # "type":"web_url",
-        # "url": "https://news.ycombinator.com/",
-        # "title":"More stories"
         "type":"postback",
         "title":"More stories",
         "payload":"MORE_%s_%s"%(story_type, offset+9)
+    }
+
+    no_more_stories_button = {
+        "type":"web_url",
+        "url": "https://news.ycombinator.com/",
+        "title":"No more stories"
     }
 
     search_query = "https://hn.algolia.com/?query=%s"%(story_type)
@@ -261,20 +273,19 @@ def send_stories(token, user_id, posts, story_type="daily_top", offset=0):
         "webview_height_ratio": "tall",
     }
 
+    button_title = "Load more stories"
     if story_type == "daily_top":
-        button = today_stories_button_more
-        default_button = {
-            "type":"postback",
-            "payload":"MORE_%s_%s"%(story_type, offset+9)
-        }
+        if no_more_stories:
+            button = no_more_stories_button
+            button_title = "No more stories for now"
+        else:
+            button = today_stories_button_more
+
     else:
         button = search_button_more
-        default_button = {
-            "type":"web_url",
-            "url": search_query
-        }
+
     read_more = {
-            "title": "Load more stories",
+            "title": button_title,
             "image_url": ERROR_IMG,
             "subtitle": "",
             "default_action":
