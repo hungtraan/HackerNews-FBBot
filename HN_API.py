@@ -20,27 +20,33 @@ def get_stories(story_type='top', limit=LIMIT):
     # r = requests.get("/%sstories.json"%(story_type))
     results = firebase.get('/v0/%sstories'%(story_type), None)
     stories_list = results[:limit]
-    
+    num_stories = len(stories_list)
+    i = 0
     stories = []
 
     for story_id in stories_list:
-        story = firebase.get("/v0/item/%s"%(story_id), None)
-        story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story_id)
-        utc_time = datetime.utcfromtimestamp(story['time'])
-        # story['datetime'] = utc_time.strftime("%Y-%m-%d")
-        story['datetime'] = get_human_time(utc_time)
-        # Only include news stories, not HN discussions
-        if story_type == 'top' or story_type == 'best':
-            if 'url' in story and story['type'] == 'story':
-                if story['url'] == '' or story['url'] is None:
-                    story['url'] = story['hn_url']
-                story['image_url'] = get_og_img(story['url'])
+        i += 1
+        try:
+            story = firebase.get("/v0/item/%s"%(story_id), None)
+            story['hn_url'] = 'https://news.ycombinator.com/item?id=%s'%(story_id)
+            utc_time = datetime.utcfromtimestamp(story['time'])
+            # story['datetime'] = utc_time.strftime("%Y-%m-%d")
+            story['datetime'] = get_human_time(utc_time)
+            # Only include news stories, not HN discussions
+            if story_type == 'top' or story_type == 'best':
+                if 'url' in story and story['type'] == 'story':
+                    if story['url'] == '' or story['url'] is None:
+                        story['url'] = story['hn_url']
+                    story['image_url'] = get_og_img(story['url'])
+                    stories.append(story)
+                    
+            else:
+                # Note: Job type does not have descendants
                 stories.append(story)
-                
-        else:
-            # Note: Job type does not have descendants
-            stories.append(story)
-        print "[Saved] %s"%(story['title'])
+            print "[Caching] %s/%s"%(i, num_stories)
+        except Exception, e:
+            print(e)
+            # traceback.print_exc()
         
     return stories
 

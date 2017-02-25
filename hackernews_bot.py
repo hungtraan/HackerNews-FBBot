@@ -342,6 +342,7 @@ except (KeyboardInterrupt, SystemExit):
 
 # Allows running with simple `python <filename> <port>`
 if __name__ == '__main__':
+	refresh_daily_stories()
 	if len(sys.argv) == 2: # Allow running on customized ports
 		app.run(port=int(sys.argv[1]))
 
