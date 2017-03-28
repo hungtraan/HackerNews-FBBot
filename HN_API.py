@@ -39,7 +39,7 @@ def get_stories(story_type='top', limit=LIMIT):
                         story['url'] = story['hn_url']
                     story['image_url'] = get_og_img(story['url'])
                     stories.append(story)
-                    
+
             else:
                 # Note: Job type does not have descendants
                 stories.append(story)
@@ -47,13 +47,13 @@ def get_stories(story_type='top', limit=LIMIT):
         except Exception, e:
             print(e)
             # traceback.print_exc()
-        
+
     return stories
 
 def stories_from_search(query, search_type="top"):
     search_type = 'search' if search_type=="top" else 'search_by_date'
     url = "http://hn.algolia.com/api/v1/%s?query=%s&tags=story"%(search_type, query)
-    
+
     r = requests.get(url)
     if r.status_code != requests.codes.ok:
         print r.text
@@ -70,9 +70,12 @@ def stories_from_search(query, search_type="top"):
             story['url'] = story['hn_url']
         story['image_url'] = get_og_img(story['url'])
         stories.append(story)
-        print "[Saved] %s"%(story['title'])
+        try:
+            print "[Saved] %s"%(story['title'])
+        except Exception, e:
+            print e
     # pprint.pprint(stories_list)
-    
+
     return stories
 
 def get_og_img(url):
@@ -101,7 +104,7 @@ def get_og_img(url):
 
         soup = BeautifulSoup(content, "html.parser")
         meta_tag = soup.select("meta[property='og:image']")
-        
+
         if len(meta_tag) > 0:
             # found og:image
             img = meta_tag[0]['content']
@@ -117,7 +120,7 @@ def get_og_img(url):
                     img = "http:" + img
                 elif img != '' and 'http' not in img:
                     if 'data:image/' == img[:11]:
-                        return ERROR_IMG                    
+                        return ERROR_IMG
                     img = urljoin(url, img)
 
     except Exception, e:
@@ -126,9 +129,9 @@ def get_og_img(url):
         traceback.print_exc()
 
     return img
-        
+
 def decode (page):
-    encoding = page.info().get("Content-Encoding")    
+    encoding = page.info().get("Content-Encoding")
     if encoding in ('gzip', 'x-gzip', 'deflate'):
         content = page.read()
         if encoding == 'deflate':
@@ -142,7 +145,7 @@ def decode (page):
 # =================== RESTful methods ==============
 def get_stories_rest(story_type='top', limit=9):
     r = requests.get("/%sstories.json"%(story_type))
-    
+
     if r.status_code != requests.codes.ok:
         print r.text
         return
@@ -175,7 +178,7 @@ To do:
 
 For Show, Ask:
 - Aggregate and rank by score
-- 
+-
 """
 
 # print("Top")
