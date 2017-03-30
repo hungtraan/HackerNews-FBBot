@@ -1,0 +1,14 @@
+# Production config file
+
+DEBUG = False
+
+OWN_WEBHOOK_TOKEN = ''
+
+# Facebook Page Access Token
+PAT = ''
+FACEBOOK_APP_ID = ''
+FACEBOOK_APP_SECRET = ''
+
+# Bot operation variables:
+PRINT_INCOMING_PAYLOAD = False
+PRINT_INCOMING_MESSAGE = False
